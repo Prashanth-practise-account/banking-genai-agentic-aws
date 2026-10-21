@@ -1,0 +1,95 @@
+
+# ==========================================
+# API and Configuration
+# ==========================================
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+python-multipart
+
+# ==========================================
+# AWS Bedrock and AWS SDK
+# ==========================================
+boto3
+botocore
+aws-xray-sdk
+
+# ==========================================
+# LangChain and LangGraph
+# ==========================================
+langchain
+langchain-core
+langchain-community
+langchain-aws
+langgraph
+langgraph-checkpoint
+
+# ==========================================
+# CrewAI - Fraud Investigation
+# ==========================================
+crewai
+
+# ==========================================
+# AutoGen - Multi-Agent Review
+# ==========================================
+autogen-agentchat
+autogen-ext[openai]
+
+# ==========================================
+# Microsoft Semantic Kernel
+# ==========================================
+semantic-kernel
+
+# ==========================================
+# DSPy - RAG Optimization
+# ==========================================
+dspy
+
+# ==========================================
+# OpenSearch Vector Database
+# ==========================================
+opensearch-py
+
+# ==========================================
+# Embeddings and Document Processing
+# ==========================================
+sentence-transformers
+numpy
+pandas
+pypdf
+python-docx
+beautifulsoup4
+tiktoken
+
+# ==========================================
+# RAG Evaluation
+# ==========================================
+ragas
+datasets
+scikit-learn
+
+# ==========================================
+# Observability
+# ==========================================
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+structlog
+
+# ==========================================
+# Security and Validation
+# ==========================================
+cryptography
+PyJWT
+email-validator
+
+# ==========================================
+# Testing and Code Quality
+# ==========================================
+pytest
+pytest-asyncio
+pytest-cov
+ruff

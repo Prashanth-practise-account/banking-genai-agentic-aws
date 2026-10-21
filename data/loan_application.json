@@ -1,0 +1,17 @@
+
+{
+  "application_id": "APP-1001",
+  "applicant_name": "Ravi Kumar",
+  "employment_type": "Salaried",
+  "employer_name": "ABC Technologies Pvt Ltd",
+  "monthly_net_salary": 85000,
+  "existing_monthly_emis": 12000,
+  "requested_loan_amount": 800000,
+  "annual_interest_rate": 8.5,
+  "tenure_years": 5,
+  "loan_purpose": "Home renovation",
+  "identity_document_status": "uploaded",
+  "salary_slips_uploaded": 6,
+  "bank_statement_months": 6,
+  "credit_score": 750
+}

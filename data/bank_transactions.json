@@ -1,0 +1,27 @@
+
+[
+  {
+    "date": "2026-04-01",
+    "description": "ABC TECHNOLOGIES SALARY",
+    "credit": 85000,
+    "debit": 0
+  },
+  {
+    "date": "2026-04-05",
+    "description": "RENT PAYMENT",
+    "credit": 0,
+    "debit": 15000
+  },
+  {
+    "date": "2026-04-10",
+    "description": "EXISTING LOAN EMI",
+    "credit": 0,
+    "debit": 12000
+  },
+  {
+    "date": "2026-05-01",
+    "description": "ABC TECHNOLOGIES SALARY",
+    "credit": 85000,
+    "debit": 0
+  }
+]
