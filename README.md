@@ -1,207 +1,216 @@
-# banking-genai-agentic-aws
+# Banking GenAI Agentic AWS
 
-A production-grade **multi-agent banking platform on AWS Bedrock** — automating
-four enterprise banking workflows:
+A multi-use-case banking AI platform built using Generative AI, agentic workflows, document processing, and Retrieval-Augmented Generation (RAG).
 
-  1. Loan Approval Automation      (LangGraph ReAct + HITL)
-  2. Fraud Investigation           (CrewAI multi-agent)
-  3. AML / KYC Compliance Q&A      (Hybrid RAG with citations)
-  4. Customer Support Agent        (LangGraph + streaming)
+## Use Cases
 
-Built on **AWS Bedrock + Bedrock AgentCore**, **LangGraph**, **CrewAI**,
-**AutoGen**, **Semantic Kernel**, **DSPy**, **OpenAI AgentKit**,
-**MCP (2026-07-28 spec)**, and **A2A v1.0** — with production guardrails,
-observability, and evaluation built in from day one.
+### 1. Loan Approval Automation
 
----
+Automates the initial processing of loan applications by accepting applicant details and supporting documents, extracting information, and converting unstructured document content into structured data.
 
-## Architecture (high level)
+**Key Features**
+- FastAPI endpoint for loan application submission and document uploads.
+- PDF text extraction using `pypdf`.
+- Image text extraction using Tesseract OCR and Pillow.
+- Qwen 3 4B integration through Ollama and LangChain.
+- LLM-based structured document extraction into JSON.
+- Support for processing multiple uploaded documents.
+- Loan application state modeling using Python `TypedDict`.
 
-    ┌──────────────────────────────────────────────────────────┐
-    │  FastAPI (api/main.py)                                   │
-    │  /loan/approve · /fraud/investigate · /rag/query         │
-    │  /support/chat                                           │
-    └──────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-    ┌──────────────────────────────────────────────────────────┐
-    │  Agent Mesh (6 frameworks)                               │
-    │                                                          │
-    │  • LangGraph     — stateful supervisor (Loan, Support)   │
-    │  • CrewAI        — role-based crew (Fraud)               │
-    │  • AutoGen       — debate + self-correct (Risk Review)   │
-    │  • Semantic K.   — enterprise plugin orchestration       │
-    │  • DSPy          — compiled & optimized RAG (AML/KYC)    │
-    │  • AgentKit      — visual workflow + Connector Registry  │
-    └──────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-    ┌──────────────────────────────────────────────────────────┐
-    │  Protocols                                               │
-    │  • MCP (2026-07-28 spec) — agent ↔ tools                 │
-    │  • A2A (v1.0)            — agent ↔ agent                 │
-    └──────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-    ┌──────────────────────────────────────────────────────────┐
-    │  Tools (5 banking tools)                                 │
-    │  retrieve_docs · classify_risk · forecast_sales          │
-    │  get_sentiment · generate_recovery                       │
-    └──────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-    ┌──────────────────────────────────────────────────────────┐
-    │  AWS Services                                            │
-    │  Bedrock · AgentCore · OpenSearch · SageMaker ·          │
-    │  Guardrails · CloudWatch · Secrets Manager               │
-    └──────────────────────────────────────────────────────────┘
+**Workflow**
 
----
+```text
+Applicant Details + Documents
+            |
+            v
+       FastAPI API
+            |
+            v
+    Document Extraction
+            |
+            v
+     Qwen 3 4B (Ollama)
+            |
+            v
+    Structured JSON Data
+            |
+            v
+ Verification and Eligibility
+```
 
-## 4 Banking Use Cases
+### 2. Customer Support Agent
 
-| # | Use case | Agent pattern | Frameworks | Primary AWS services |
-|---|----------|---------------|------------|----------------------|
-| 1 | **Loan Approval** | LangGraph supervisor + HITL | LangGraph, Semantic Kernel | Bedrock, AgentCore Runtime+Memory, SageMaker, Guardrails |
-| 2 | **Fraud Investigation** | CrewAI 3-role crew + AutoGen debate | CrewAI, AutoGen | Bedrock, AgentCore Gateway, OpenSearch, MCP |
-| 3 | **AML/KYC Q&A** | DSPy-compiled RAG pipeline | DSPy, LangChain | Bedrock KB, OpenSearch, Titan Embeddings, Guardrails |
-| 4 | **Customer Support** | LangGraph ReAct + streaming + AgentKit UI | LangGraph, AgentKit, ChatKit | Bedrock, AgentCore Memory, CloudWatch |
+Provides AI-powered responses to customer banking queries using an agentic workflow.
 
----
+**Example Query**
 
-## Agentic Framework Matrix
+```text
+Customer: Why was I charged ₹500 last week?
+```
 
-| Framework | Role in this platform | Use case |
-|-----------|----------------------|----------|
-| **LangGraph** | Stateful supervisor with checkpoints, HITL interrupts, resumable graphs | Loan Approval, Customer Support |
-| **CrewAI** | Role-based crew (Analyst, Investigator, Evidence Assembler) with delegation | Fraud Investigation |
-| **AutoGen** | Multi-agent debate (Bull vs Bear vs Judge) + self-correcting code loops | Risk Review, Compliance edge cases |
-| **Semantic Kernel** | Enterprise plugin orchestration — C#/.NET, planner, function calling | Cross-system banking orchestration |
-| **DSPy** | Programmatic prompt optimization — compilers auto-tune prompts and RAG pipelines | AML/KYC RAG |
-| **OpenAI AgentKit** | Visual workflow builder, Connector Registry, ChatKit UI, Guardrails library | Customer Support interface |
-| **MCP** | Agent ↔ tool protocol (2026-07-28 spec: stateless core, OAuth hardening) | All agents |
-| **A2A v1.0** | Agent ↔ agent protocol — AgentCard discovery, task delegation | Multi-agent delegation |
+**Expected Workflow**
 
----
+1. The agent receives the customer's question.
+2. The agent determines which information is required.
+3. It calls the relevant tools, such as transaction-history lookup.
+4. It retrieves relevant banking policy information when needed.
+5. The LLM generates a response using the retrieved information.
 
-## Protocol Deep Dive
+**Example Response**
 
-### MCP (Model Context Protocol) — 2026-07-28 Spec
+```text
+Your ₹500 charge was the annual debit card fee.
+This is charged once per year under the applicable
+banking policy. Would you like to know about
+available fee-waiver options?
+```
 
-MCP has become the industry standard for connecting AI agents to applications,
-surpassing 400M monthly SDK downloads.
+**Technologies:** LangGraph, LangChain, Ollama, and tool-based agent workflows.
 
-Key changes in the 2026-07-28 spec:
+### 3. AML / KYC Compliance Q&A
 
-  - Stateless core — moves from bidirectional stateful to request/response;
-    servers can now deploy on serverless and edge infrastructure
-  - Standardized extensions — MCP Apps and Tasks ship under a versioned
-    extensions framework
-  - Auth hardening — aligns with production OAuth 2.0 and OIDC for enterprise
-    identity systems like Entra or Okta
-  - MCP Server Cards — HTTP server discovery standardized (SEP-2127)
-  - Tasks Extension — long-running work formalized (SEP-2663)
+Helps users answer Anti-Money Laundering (AML) and Know Your Customer (KYC) compliance questions by retrieving relevant information from banking policy documents and regulatory PDFs.
 
-### A2A (Agent-to-Agent) — v1.0
+**Example Query**
 
-A2A v1.0 shipped March 2026 and joined the Agentic AI Foundation (AAIF) in
-August 2026, alongside MCP.
+```text
+What are the KYC requirements for cash transactions above ₹10 lakh?
+```
 
-Key characteristics:
+**Workflow**
 
-  - Agent Cards — structured discovery metadata for capabilities and endpoints
-  - Task lifecycle — 9 states (COMPLETED, FAILED, CANCELED, REJECTED,
-    INPUT_REQUIRED, AUTH_REQUIRED, SUBMITTED, WORKING, UNSPECIFIED)
-  - Three delivery modes — polling, streaming (SSE), push notifications
-  - Framework-agnostic — agents built with different frameworks can communicate
-  - Production support — Google Cloud, Azure AI Foundry, and AWS Bedrock
-    AgentCore all host A2A servers
+1. Load banking policy documents and regulatory PDFs.
+2. Split documents into smaller text chunks.
+3. Generate embeddings for document retrieval.
+4. Retrieve relevant passages using hybrid search.
+5. Use the retrieved context to generate a grounded answer.
+6. Use DSPy to optimize the RAG pipeline where configured.
 
-The distinction:
+**Technologies:** DSPy, Hybrid RAG, Amazon Titan Embeddings, OpenSearch, and an LLM.
 
-  - MCP standardizes how agents connect to tools and data.
-  - A2A standardizes how agents communicate with each other.
+## Technology Stack
 
----
+| Component | Technologies |
+|---|---|
+| Backend API | FastAPI, Uvicorn |
+| LLM | Qwen 3 4B, Ollama |
+| LLM Integration | LangChain |
+| Agent Workflows | LangGraph |
+| Document Processing | pypdf, Pillow, Tesseract OCR |
+| Compliance Q&A | DSPy, Hybrid RAG |
+| Embeddings | Amazon Titan Embeddings |
+| Vector Search | OpenSearch |
+| Frontend | Streamlit |
+| Language | Python |
 
 ## Project Structure
 
-    banking-genai-agentic-aws/
-    ├── config/              # Pydantic settings + constants
-    ├── data/                # Banking policy corpus + golden sets
-    ├── ingestion/           # S3/local loaders + token-aware chunker
-    ├── embeddings/          # Bedrock Titan Embeddings wrapper
-    ├── vectorstore/         # OpenSearch Serverless client
-    ├── retrieval/           # Hybrid (BM25 + dense) + rerank
-    ├── llm/                 # Bedrock Converse + multi-provider router
-    ├── guardrails/          # Bedrock Guardrails + PII masking
-    ├── agents/              # LangGraph + CrewAI + AutoGen + SK + DSPy
-    ├── protocols/           # MCP server + A2A agent card + delegation
-    ├── agentkit/            # AgentKit visual workflows + ChatKit UI
-    ├── evaluation/          # RAGAS + LLM-as-judge + DSPy metrics
-    ├── observability/       # CloudWatch + LangSmith + OpenTelemetry
-    ├── api/                 # FastAPI endpoints
-    ├── infra/               # Terraform + IAM
-    ├── tests/               # pytest suite
-    └── scripts/             # ingest / build index / demo
+```text
+banking-genai-agentic-aws/
+├── config/
+├── data/
+├── ingestion/
+├── embeddings/
+├── vectorstore/
+├── retrieval/
+├── llm/
+├── guardrails/
+├── agents/
+├── protocols/
+├── agentkit/
+├── evaluation/
+├── observability/
+├── api/
+├── infra/
+├── tests/
+├── scripts/
+└── frontend.py
+```
 
----
+*The exact folder and file names may differ depending on the current project structure.*
 
-## Setup
+## Setup and Installation
 
-    # 1. Clone and enter
-    git clone <repo> banking-genai-agentic-aws
-    cd banking-genai-agentic-aws
+### 1. Clone the repository
 
-    # 2. Create virtual environment
-    python -m venv .venv
-    source .venv/bin/activate          # Windows: .venv\Scripts\activate
+```bash
+git clone <your-repository-url>
+cd banking-genai-agentic-aws
+```
 
-    # 3. Install dependencies
-    pip install -r requirements.txt
+### 2. Create and activate a virtual environment
 
-    # 4. Configure environment
-    cp .env.example .env
-    # Edit .env and set AWS credentials + Bedrock model IDs
+**Windows PowerShell**
 
-    # 5. Ingest banking policy corpus
-    make ingest
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
 
-    # 6. Run end-to-end demo
-    make demo
+### 3. Install dependencies
 
----
+```bash
+pip install fastapi uvicorn streamlit requests python-multipart
+pip install langchain langchain-ollama pypdf pillow pytesseract
+```
 
-## Design Principles
+Install any additional dependencies required by the Customer Support Agent and AML / KYC Compliance Q&A components.
 
-1. Provider-agnostic LLM layer — BaseLLM contract; swap Bedrock for
-   OpenAI/Claude/Ollama without touching agent code.
+### 4. Set up Ollama
 
-2. Framework-per-job — LangGraph for stateful supervisors, CrewAI for
-   role-based crews, AutoGen for debate, DSPy for optimized RAG,
-   AgentKit for UI, Semantic Kernel for enterprise plugins.
+Install Ollama, then download the model:
 
-3. Protocol-first — MCP for tools, A2A for agent delegation. No custom
-   wire formats.
+```bash
+ollama pull qwen3:4b
+```
 
-4. Ground everything — every RAG answer cites its source chunk ID.
+Make sure Ollama is running before starting the application.
 
-5. Human-in-the-Loop by default — anything above Rs 5L (loans) pauses for
-   officer approval via LangGraph interrupt.
+For image OCR, install Tesseract OCR separately on Windows.
 
-6. Least-privilege tools — each agent has a scoped IAM role and a whitelist
-   of callable tools.
+## Running the Application
 
-7. Measure before you ship — RAGAS + LLM-as-judge golden set runs in CI.
+### Step 1: Start the FastAPI backend
 
-8. Optimize prompts programmatically — DSPy compilers replace manual
-   prompt engineering.
+Open a terminal in the project root and activate the virtual environment.
 
-9. Observable at every step — LangSmith traces + CloudWatch metrics for
-   every agent run.
+If the FastAPI application is defined in `ingestion/app.py`, run:
 
----
+```bash
+uvicorn ingestion.app:app --reload
+```
+
+If your application is defined in `api/main.py`, use:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Open Swagger UI to test the API:
+
+http://127.0.0.1:8000/docs
+
+### Step 2: Start the Streamlit frontend
+
+Open a **second terminal** in the project root and activate the same virtual environment.
+
+If your frontend file is named `frontend.py`, run:
+
+```bash
+streamlit run frontend.py
+```
+
+If your frontend file has a different name, replace `frontend.py` with the actual filename.
+
+### Step 3: Use the application
+
+1. Open the local URL displayed in the Streamlit terminal, usually `http://localhost:8501`.
+2. Select the required banking use case.
+3. Enter the required information or upload supporting documents.
+4. Submit the request and review the response.
+
+Ensure the frontend sends requests to the correct FastAPI backend URL and endpoint.
 
 ## License
 
-Personal R&D · Portfolio project · Synthetic data only
+Personal R&D · Portfolio project · Synthetic data only.
