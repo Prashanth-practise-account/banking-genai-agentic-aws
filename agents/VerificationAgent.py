@@ -1,162 +1,241 @@
+import json
+import os
+import calendar
+from datetime import datetime
+from collections import defaultdict
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+json_filepath = os.path.join(base_dir, "data", "structured_output.json")
 
 class VerficationAgent:
+    def verify_application(self, state, customer_document):
+        application_name = state['application'].get("applicant_name", "")
 
-    def verfy_application(self, application, salary_slip, bank_statement):
-
-        result = {
-            "documents": [],
-            "Document_Name": [],
-            "Document_Employer": [],
-            "Document_Salary": [],
-            "Bank_Salary": [],
-            "Existing_EMI": []
+        verify = {
+            "Document_check": [],
+            "Application_Name": "",
+            "emi_existing": [],
+            "Transaction_Flagging": [],
+            "salary_slip": []
         }
 
-        if len(salary_slip) != 6 or application["bank_statement_months"] != 6:
-            result["documents"].append(
-                "All required documents are not present"
+        if (len(customer_document.get("salaryslip", [])) >= 6 and len(customer_document.get("bankstatement", [])) >= 1):
+            salaryslip_month = []
+
+            for slip in customer_document.get("salaryslip", []):
+                salaryslip_month.append(slip.get("salary_month"))
+
+            salaryslip_month.sort(
+                key=lambda month: datetime.strptime(month, "%Y-%m")
             )
-        else:
-            result["documents"].append("Documents are present")
+            missing_months = []
 
-        for slip in salary_slip:
-            if application["applicant_name"] == slip["employee_name"]:
-                result["Document_Name"].append(
-                    f'{slip["month"]}: Name is matched'
-                )
-            else:
-                result["Document_Name"].append(
-                    f'{slip["month"]}: Name is not matched'
-                )
+            for i in range(1, len(salaryslip_month)):
+                previous = datetime.strptime(salaryslip_month[i - 1], "%Y-%m")
+                current = datetime.strptime(salaryslip_month[i], "%Y-%m")
 
-        for slip in salary_slip:
-            if application["employer_name"] == slip["employer"]:
-                result["Document_Employer"].append(
-                    f'{slip["month"]}: Employer is matched'
-                )
-            else:
-                result["Document_Employer"].append(
-                    f'{slip["month"]}: Employer is not matched'
-                )
+                year = previous.year
+                month = previous.month + 1
 
-        for slip in salary_slip:
-            if application["monthly_net_salary"] == slip["net_salary"]:
-                result["Document_Salary"].append(
-                    f'{slip["month"]}: Salary is verified'
-                )
-            else:
-                result["Document_Salary"].append(
-                    f'{slip["month"]}: Salary is not matched'
-                )
+                if month > 12:
+                    month = 1
+                    year += 1
 
-        salary_credits = [
-            transaction
-            for transaction in bank_statement
-            if "SALARY" in transaction["description"].upper()
-            and transaction["credit"] > 0
-        ]
+                while (year, month) < (current.year, current.month):
+                    missing_months.append(
+                        f"{calendar.month_name[month]} {year}"
+                    )
 
-        for transaction in salary_credits:
-            if transaction["credit"] == application["monthly_net_salary"]:
-                result["Bank_Salary"].append(
-                    f'{transaction["date"]}: Salary credit is verified'
-                )
-            else:
-                result["Bank_Salary"].append(
-                    f'{transaction["date"]}: Salary credit is not matched'
-                )
+                    month += 1
+                    if month > 12:
+                        month = 1
+                        year += 1
 
-        if not salary_credits:
-            result["Bank_Salary"].append("No salary credits found")
+            if len(missing_months) == 0:
+                verify["Document_check"].append({
+                    "check": "document_completeness",
+                    "passed": True,
+                    "detail": "6 salary slips and 6 months of bank statements present"
+                })
+            elif len(missing_months) > 0:
+                verify["Document_check"].append({
+                    "check": "document_completeness",
+                    "passed": False,
+                    "detail": f"missing Documents are: {missing_months}"
+                })
 
-        emi_found = any(
-            "EMI" in transaction["description"].upper()
-            and transaction["debit"] == application["existing_monthly_emis"]
-            for transaction in bank_statement
+        salary_statement_name = []
+
+        bank_statement = customer_document.get("bankstatement", [])
+
+        account_holder_name = (
+            bank_statement[0].get("account_holder_name", "")
+            if bank_statement
+            else ""
         )
 
-        if emi_found:
-            result["Existing_EMI"].append("Existing EMI is verified")
+        identifier = customer_document.get("identifier") or []
+        pancard_name = (
+            identifier[0].get("full_name", "")
+            if len(identifier) > 0 and isinstance(identifier[0], dict)
+            else ""
+        )
+
+        aadhar_name = (
+            identifier[1].get("full_name", "")
+            if len(identifier) > 1 and isinstance(identifier[1], dict)
+            else ""
+        )
+
+        for slip in customer_document.get("salaryslip", []):
+            salary_statement_name.append(slip.get("employee_name", ""))
+
+        name = []
+
+        for saal in salary_statement_name:
+            if application_name.strip().casefold() == saal.strip().casefold():
+                name.append("true")
+            else:
+                name.append("false")
+
+        for person_name in [
+            account_holder_name,
+            pancard_name,
+            aadhar_name
+        ]:
+            if (
+                application_name.strip().casefold()
+                == person_name.strip().casefold()
+            ):
+                name.append("true")
+            else:
+                name.append("false")
+
+        if all(result == "true" for result in name):
+            verify['Application_Name'] = {
+                "check": "name_consistency",
+                "passed": True,
+                "detail": (
+                    f"Application='{application_name}', "
+                    f"Salary slips={salary_statement_name}, "
+                    f"Bank='{account_holder_name}', "
+                    f"PAN='{pancard_name}', "
+                    f"Aadhaar='{aadhar_name}' — match"
+                )
+            }
         else:
-            result["Existing_EMI"].append(
-                "Existing EMI could not be verified"
+            verify['Application_Name'] = {
+                "check": "name_consistency",
+                "passed": False,
+                "detail": (
+                    f"Application='{application_name}', "
+                    f"Salary slips={salary_statement_name}, "
+                    f"Bank='{account_holder_name}', "
+                    f"PAN='{pancard_name}', "
+                    f"Aadhaar='{aadhar_name}' — mismatch"
+                )
+            }
+
+        bank_statement = customer_document.get('bankstatement', [])
+
+        for statement in bank_statement:
+            for transaction in statement.get('transactions', []):
+                if transaction.get("possible_emi_or_loan_payment") is True:
+                    verify['emi_existing'].append(
+                        {
+                            "transaction_date": transaction.get('transaction_date', ""),
+                            "description": transaction.get('description', ""),
+                            "credit_amt": transaction.get('credit_amount', ""),
+                            "balance": transaction.get('balance', ""),
+                            "debt": transaction.get('debit_amount', ""),
+                            "transaction_category": transaction.get("transaction_category", ""),
+                        }
+                    )
+
+        for statement in bank_statement:
+            for transaction in statement.get('transactions', []):
+                if transaction.get("transaction_category", "") == "unknown":
+                    verify['Transaction_Flagging'].append(
+                        {
+                            "transaction_date": transaction.get('transaction_date', ""),
+                            "description": transaction.get('description', ""),
+                            "credit_amt": transaction.get('credit_amount', ""),
+                            "balance": transaction.get('balance', ""),
+                            "transaction_category": transaction.get("transaction_category", ""),
+                            "Flag": "Needs clarification"
+                        }
+                    )
+
+        salary_slips = customer_document.get('salaryslip', [])
+
+        if salary_slips:
+            salary_by_month = {}
+
+            for slip in salary_slips:
+                month = slip.get('salary_month', '')
+                salary = slip.get('net_salary', 0)
+
+                salary_by_month[month] = salary
+
+            salaries = list(salary_by_month.values())
+            first_salary = salaries[0]
+
+            salary_match = all(
+                abs(salary - first_salary) <= first_salary * 0.01
+                for salary in salaries
             )
 
-        return result
+            if salary_match:
+                verify['salary_slip'].append(
+                    {
+                        "check": "salary_consistency",
+                        "passed": True,
+                        "detail": (
+                            f"All {len(salaries)} months: "
+                            f"₹{first_salary:,.0f} (0% variance)"
+                        )
+                    }
+                )
 
+            else:
+                salary_details = ", ".join(
+                    f"{month}="
+                    f"₹{salary:,.0f}"
+                    for month, salary in salary_by_month.items()
+                )
 
+                lowest_salary = min(salaries)
+                drop_percentage = (
+                    (first_salary - lowest_salary) / first_salary * 100
+                    if first_salary > 0 else 0
+                )
+
+                lowest_month = next(
+                    month for month, salary in salary_by_month.items()
+                    if salary == lowest_salary
+                )
+
+                verify['salary_slip'].append(
+                    {
+                        "check": "salary_consistency",
+                        "passed": False,
+                        "detail": (
+                            f"{salary_details} — "
+                            f"{drop_percentage:.0f}% drop in {lowest_month}"
+                        )
+                    }
+                )
+
+        return verify
+        
 if __name__ == "__main__":
-
-    application = {
-        "application_id": "APP-1001",
-        "applicant_name": "Ravi Kumar",
-        "employment_type": "Salaried",
-        "employer_name": "ABC Technologies Pvt Ltd",
-        "monthly_net_salary": 85000,
-        "existing_monthly_emis": 12000,
-        "requested_loan_amount": 800000,
-        "annual_interest_rate": 8.5,
-        "tenure_years": 5,
-        "loan_purpose": "Home renovation",
-        "identity_document_status": "uploaded",
-        "salary_slips_uploaded": 6,
-        "bank_statement_months": 6,
-        "credit_score": 750
-    }
-
-    salary_slip = [
-        {
-            "month": "2026-04",
-            "employee_name": "Ravi Kumar",
-            "employer": "ABC Technologies Pvt Ltd",
-            "net_salary": 85000
-        },
-        {
-            "month": "2026-05",
-            "employee_name": "Ravi Kumar",
-            "employer": "ABC Technologies Pvt Ltd",
-            "net_salary": 85000
-        },
-        {
-            "month": "2026-06",
-            "employee_name": "Ravi Kumar",
-            "employer": "ABC Technologies Pvt Ltd",
-            "net_salary": 85000
-        }
-    ]
-
-    bank_statement = [
-        {
-            "date": "2026-04-01",
-            "description": "ABC TECHNOLOGIES SALARY",
-            "credit": 85000,
-            "debit": 0
-        },
-        {
-            "date": "2026-04-05",
-            "description": "RENT PAYMENT",
-            "credit": 0,
-            "debit": 15000
-        },
-        {
-            "date": "2026-04-10",
-            "description": "EXISTING LOAN EMI",
-            "credit": 0,
-            "debit": 12000
-        },
-        {
-            "date": "2026-05-01",
-            "description": "ABC TECHNOLOGIES SALARY",
-            "credit": 85000,
-            "debit": 0
-        }
-    ]
+    with open(json_filepath, "r", encoding="utf-8") as structure_data:
+        app = json.load(structure_data)
 
     agent = VerficationAgent()
-
-    verify = agent.verfy_application(
-        application, salary_slip, bank_statement
-    )
-
-    for key, value in verify.items():
-        print(f"{key}: {value}")
+    verify = agent.verify_application({
+            "application": {
+        "application_name": "Ravi Kumar"
+    }
+    }, app)
+    print(verify)

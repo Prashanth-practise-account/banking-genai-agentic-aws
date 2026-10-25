@@ -2,18 +2,20 @@
 from typing import TypedDict, Any
 
 
+
+from typing import TypedDict, Any
+
+
 class LoanState(TypedDict, total=False):
     application: dict
-    documents: list
-    salary_slips: list
-    bank_statement: list
+    documents_text: str
 
-    document_result: dict
-    verification_result: dict
+    structured_documents: dict[str, Any]
+    verification_result: Any
     eligibility_result: dict
-    policy_result: list
-
+    policy_results: list
+    status: str
     next_action: str
-    routing_reason: str
-    human_review_result: dict
+    reason: str
+
     final_decision: dict
